@@ -1,0 +1,82 @@
+<result-list>
+  <!--
+    ==========================================================================
+    COMPOSANT <result-list>
+
+    RÔLE : afficher la liste des formations retournées par l'API sous forme de cartes.
+
+    PROPS reçues depuis <app> :
+      - results    : tableau de formations (objets creerFormation)
+      - hasSearched: boolean → true si l'utilisateur a lancé au moins une recherche
+      - loading    : boolean → true pendant un appel API
+      - ondetail   : callback(index) → ouvrir la fiche détail de la formation
+      - onselect   : callback(index) → ajouter la formation au comparateur
+
+    Ce composant est "passif" : il ne fait aucun appel API, il affiche
+    uniquement les données transmises par le parent.
+    ==========================================================================
+  -->
+
+  <div class="results">
+
+    <!-- Message "aucun résultat" : affiché si la recherche est terminée et vide -->
+    <div class="message" if={ props.results.length === 0 && props.hasSearched && !props.loading }>
+      Aucun résultat trouvé
+    </div>
+
+    <!-- Message de chargement : affiché pendant l'appel API -->
+    <div class="message" if={ props.loading }>
+      Chargement...
+    </div>
+
+    <!-- Boucle sur les formations : "each" est la directive de boucle de Riot -->
+    <!-- key={ formation.id } permet à Riot d'optimiser le rendu (évite les re-rendus inutiles) -->
+    <div each={ (formation, index) in props.results } key={ formation.id } class="card">
+      <h3>{ formation.nom }</h3>
+      <p><b>Établissement :</b> { formation.etablissement }</p>
+      <p><b>Ville :</b> { formation.ville } ({ formation.departement })</p>
+      <p><b>Filière :</b> { formation.filiere }</p>
+      <p><b>Taux d'accès :</b> { formation.tauxAcces }%</p>
+
+      <!-- bind(this, index) : passe l'index en argument au handler sans créer de closure -->
+      <button onclick={ afficherDetail.bind(this, index) }>Voir détail</button>
+      <button onclick={ ajouterALaSelection.bind(this, index) }>Ajouter à la sélection</button>
+
+      <!-- Bouton "Localiser" : affiché uniquement si la formation a des coordonnées GPS -->
+      <button onclick={ localiserSurCarte.bind(this, formation) } if={ formation.latitude != null }>Localiser</button>
+    </div>
+
+  </div>
+
+  <script>
+    export default {
+
+      // Demande au parent d'afficher la vue détail pour la formation à cet index
+      afficherDetail(index) {
+        this.props.ondetail(index);
+      },
+
+      // Demande au parent d'ajouter la formation à la sélection du comparateur
+      ajouterALaSelection(index) {
+        this.props.onselect(index);
+      },
+
+      // ========================================================================
+      // localiserSurCarte(formation)
+      // RÔLE : centrer la carte Leaflet sur cette formation.
+      //
+      // Communication avec <map-view> via window.mapFocus :
+      // Les composants Riot ne peuvent pas communiquer directement entre eux
+      // (ils ne sont pas parent/enfant ici). On utilise donc une fonction globale
+      // window.mapFocus définie par <map-view> dans son onMounted.
+      // ========================================================================
+      localiserSurCarte(formation) {
+        if (window.mapFocus) {
+          window.mapFocus(formation.id); // <map-view> centre la carte sur ce marqueur
+        }
+      }
+
+    };
+  </script>
+
+</result-list>

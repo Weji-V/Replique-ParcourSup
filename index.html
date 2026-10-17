@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Parcoursup Explorer</title>
+
+  <!-- Inclusion des feuilles de style pour l'application, la carte (Leaflet) et les graphiques (Charts.css) -->
+  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/charts.css/dist/charts.min.css" />
+
+  <!-- Inclusion de Riot.js pour la gestion des composants et de Leaflet pour la cartographie -->
+  <script src="https://cdn.jsdelivr.net/npm/riot@9/riot+compiler.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+
+<body>
+
+  <!-- Point de montage de l'application : le composant <app> va y être instancié -->
+  <app></app>
+
+  <!-- 
+      IMPORT DES COMPOSANTS RIOT (Les "briques" de notre application)
+      L'application est découpée en petits morceaux réutilisables (composants).
+      L'attribut type="riot" indique au compilateur Riot.js de transformer 
+      ce code spécial (.riot) en vrai JavaScript compréhensible par le navigateur.
+      L'ordre est ici très important : on charge d'abord les enfants, 
+      et on termine toujours par le composant principal (app.riot).
+    -->
+  <script src="./components/search-bar.riot" type="riot"></script>
+  <script src="./components/result-list.riot" type="riot"></script>
+  <script src="./components/detail-view.riot" type="riot"></script>
+  <script src="./components/map-view.riot" type="riot"></script>
+  <script src="./components/auth-panel.riot" type="riot"></script>
+  <script src="./components/comparateur.riot" type="riot"></script>
+  <script src="./app.riot" type="riot"></script>
+
+  <!-- 
+      SCRIPT D'INITIALISATION
+      L'attribut type="module" est obligatoire en HTML moderne dès qu'on 
+      découpe son code JavaScript dans plusieurs fichiers. 
+      Cela nous permet d'utiliser "import" pour récupérer les fonctions de notre API,
+      du Firebase et de notre algorithme depuis les fichiers séparés.
+    -->
+  <script type="module">
+    import { chargerFormations, chargerHistoriqueFormation } from './api.js'
+    import { creerFormation } from './formation.js'
+    import { auth, db, createAccount, login, logout, onUserChanged, saveUserData, loadUserData } from './firebase.js'
+
+    // =========================================================================
+    // EXPOSITION GLOBALE
+    // Les composants Riot (.riot) ne peuvent pas faire de "import" par eux-mêmes.
+    // C'est pourquoi, une fois les fonctions importées ici, on les attache 
+    // à l'objet global `window` pour qu'elles soient accessibles partout.
+    // =========================================================================
+    window.chargerFormations = chargerFormations
+    window.creerFormation = creerFormation
+    window.chargerHistoriqueFormation = chargerHistoriqueFormation
+
+    window.firebaseServices = { auth, db, createAccount, login, logout, onUserChanged, saveUserData, loadUserData }
+
+    // Ordre des opérations : 1. Compilation des composants  2. Montage du composant principal
+    await riot.compile()
+    riot.mount('app')
+  </script>
+</body>
+
+</html>

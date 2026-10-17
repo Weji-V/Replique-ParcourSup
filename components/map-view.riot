@@ -1,0 +1,198 @@
+<map-view>
+  <!--
+    ==========================================================================
+    COMPOSANT <map-view>
+
+    RÔLE : afficher une carte interactive Leaflet avec un marqueur par formation.
+
+    BIBLIOTHÈQUE : Leaflet.js (chargée dans index.html via CDN)
+    FOND DE CARTE : OpenStreetMap (open source, gratuit)
+
+    PROPS reçues depuis <app> :
+      - results : tableau de formations (celles avec latitude/longitude non null)
+
+    COMMUNICATION INTER-COMPOSANTS :
+      Ce composant expose window.mapFocus(id) pour permettre à <result-list>
+      de centrer la carte sur une formation via le bouton "Localiser".
+      (Les deux composants ne sont pas parent/enfant → on passe par window)
+
+    CYCLE DE VIE Riot utilisé :
+      - onMounted()       → créer la carte et les marqueurs initiaux
+      - onUpdated()       → rafraîchir les marqueurs quand les résultats changent
+      - onBeforeUnmount() → détruire la carte pour libérer la mémoire
+    ==========================================================================
+  -->
+
+  <div class="map-box">
+    <h3>Carte des formations</h3>
+    <!-- Conteneur de la carte Leaflet (le ref="carte" permet d'y accéder via this.$()) -->
+    <div class="map" ref="carte"></div>
+  </div>
+
+  <script>
+    export default {
+
+      // ========================================================================
+      // onMounted() — Initialisation de la carte Leaflet
+      //
+      // Étapes :
+      //   1. Créer l'instance Leaflet attachée au div "ref=carte"
+      //   2. Créer un LayerGroup pour gérer les marqueurs en groupe
+      //   3. Ajouter le fond de carte OpenStreetMap
+      //   4. Afficher les marqueurs initiaux
+      //   5. Exposer window.mapFocus pour la communication avec result-list
+      //   6. Corriger le rendu de Leaflet (invalidateSize) après l'animation CSS
+      // ========================================================================
+      onMounted() {
+        var divCarte = this.$('div[ref="carte"]'); // sélectionne le div de la carte
+
+        // Création de la carte Leaflet centrée sur la France (lat 46.8, lon 2.5), zoom 6
+        this.carte           = L.map(divCarte).setView([46.8, 2.5], 6);
+
+        // LayerGroup : conteneur de marqueurs qui permet de tous les supprimer d'un coup
+        this.groupeMarqueurs = L.layerGroup().addTo(this.carte);
+
+        // Index id → marqueur : permet à centrerSurFormation() de retrouver rapidement un marqueur
+        this.marqueursIndex  = {};
+
+        // Ajout du fond de carte OpenStreetMap (tuiles PNG)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(this.carte);
+
+        this.afficherMarqueurs(); // premier affichage des marqueurs
+
+        var composant = this; // capture pour les callbacks setTimeout
+
+        // invalidateSize() corrige un bug fréquent : si la carte s'anime à l'apparition,
+        // Leaflet ne connaît pas encore sa taille exacte et n'affiche pas les tuiles correctement.
+        // On l'appelle deux fois avec des délais différents pour être sûr.
+        setTimeout(function() {
+          if (composant.carte) { composant.carte.invalidateSize(); }
+        }, 200);
+
+        setTimeout(function() {
+          if (composant.carte) { composant.carte.invalidateSize(); }
+        }, 500);
+
+        // Exposition de mapFocus sur window pour permettre à result-list
+        // de centrer la carte sur une formation en cliquant "Localiser"
+        window.mapFocus = function(id) {
+          composant.centrerSurFormation(id);
+        };
+      },
+
+      // ========================================================================
+      // onUpdated() — Rafraîchissement de la carte quand les props changent
+      //
+      // Appelé par Riot chaque fois que le parent met à jour les résultats.
+      // On recharge tous les marqueurs et on corrige la taille de la carte.
+      // ========================================================================
+      onUpdated() {
+        this.afficherMarqueurs();
+
+        var composant = this;
+
+        if (this.carte) {
+          setTimeout(function() { composant.carte.invalidateSize(); }, 100);
+          setTimeout(function() { composant.carte.invalidateSize(); }, 300);
+        }
+      },
+
+      // ========================================================================
+      // onBeforeUnmount() — Nettoyage avant la suppression du composant
+      //
+      // On détruit l'instance Leaflet pour libérer les event listeners
+      // et éviter les memory leaks. On nettoie aussi window.mapFocus.
+      // ========================================================================
+      onBeforeUnmount() {
+        if (this.carte) {
+          this.carte.remove(); // détruit la carte et libère la mémoire
+          this.carte = null;
+        }
+        window.mapFocus = null; // nettoie la référence globale
+      },
+
+      // ========================================================================
+      // afficherMarqueurs()
+      // RÔLE : supprimer les anciens marqueurs et en créer de nouveaux pour
+      //        chaque formation ayant des coordonnées GPS.
+      //
+      // Si des formations ont des coordonnées, on ajuste automatiquement le
+      // zoom de la carte pour les afficher toutes (fitBounds).
+      // Sinon, on revient à la vue par défaut (France entière).
+      // ========================================================================
+      afficherMarqueurs() {
+        if (!this.carte || !this.groupeMarqueurs) {
+          return;
+        }
+
+        this.groupeMarqueurs.clearLayers(); // supprime tous les marqueurs existants
+        this.marqueursIndex = {}; // réinitialise l'index
+
+        var coordonnees = []; // liste des coordonnées pour fitBounds
+        var formations  = this.props.results || [];
+
+        for (var i = 0; i < formations.length; i++) {
+          var f = formations[i];
+
+          // On n'ajoute un marqueur que si la formation a des coordonnées GPS
+          if (f.latitude != null && f.longitude != null) {
+            var marqueur = L.marker([f.latitude, f.longitude]);
+
+            // Popup : fenêtre qui s'affiche au clic sur le marqueur
+            marqueur.bindPopup('<b>' + f.nom + '</b><br>' + f.ville);
+            marqueur.addTo(this.groupeMarqueurs);
+
+            // On indexe le marqueur par l'ID de la formation pour centrerSurFormation()
+            this.marqueursIndex[f.id] = marqueur;
+            coordonnees.push([f.latitude, f.longitude]);
+          }
+        }
+
+        // Ajuste le zoom pour montrer tous les marqueurs (avec 20px de marge)
+        if (coordonnees.length > 0) {
+          this.carte.fitBounds(coordonnees, { padding: [20, 20] });
+        } else {
+          // Aucun marqueur → on recentre sur la France
+          this.carte.setView([46.8, 2.5], 6);
+        }
+      },
+
+      // ========================================================================
+      // centrerSurFormation(id)
+      // RÔLE : centrer et zoomer la carte sur une formation spécifique.
+      // Appelé par window.mapFocus (depuis result-list via bouton "Localiser").
+      //
+      // Étapes :
+      //   1. Récupérer le marqueur depuis l'index
+      //   2. Scroller jusqu'à la carte (scrollIntoView)
+      //   3. Après 400ms (fin du scroll) : corriger la taille, zoomer, ouvrir le popup
+      // ========================================================================
+      centrerSurFormation(id) {
+        var marqueur = this.marqueursIndex[id];
+
+        if (marqueur && this.carte) {
+          var divCarte = this.$('div[ref="carte"]');
+
+          // Scroll vers la carte pour que l'utilisateur la voie avant le zoom
+          if (divCarte) {
+            divCarte.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+
+          var composant = this;
+
+          // On attend la fin du scroll (~400ms) avant de zoomer sur le marqueur
+          setTimeout(function() {
+            composant.carte.invalidateSize();
+            // Zoom niveau 13 (ville) avec animation, puis ouverture du popup
+            composant.carte.setView(marqueur.getLatLng(), 13, { animate: true });
+            marqueur.openPopup();
+          }, 400);
+        }
+      }
+
+    };
+  </script>
+
+</map-view>

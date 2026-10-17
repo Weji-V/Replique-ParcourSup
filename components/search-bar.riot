@@ -1,0 +1,137 @@
+<search-bar>
+  <!--
+    Barre de recherche + filtres avancés (toggle)
+    Communique avec le parent via props.onsearch(query, filters)
+  -->
+
+  <div class="search-bar">
+    <input
+      type="text"
+      placeholder="Ex : BUT informatique, Licence droit..."
+      oninput={ updateQuery }
+      value={ state.query }
+      onkeydown={ handleKey }
+    />
+    <button onclick={ submitSearch }>Rechercher</button>
+  </div>
+
+  <!-- Bouton pour afficher/masquer les filtres avancés -->
+  <div class="filters-toggle">
+    <button class="btn btn-small btn-outline" onclick={ toggleFilters }>
+      { state.labelFiltres }
+    </button>
+  </div>
+
+  <div class="filters-panel" if={ state.showFilters }>
+    <div class="filter-row">
+
+      <!-- Les valeurs correspondent exactement aux champs de l'API Parcoursup -->
+      <div class="filter-item">
+        <label>Type de formation</label>
+        <select onchange={ updateFiliere }>
+          <option value="">Tous</option>
+          <option value="BTS">BTS</option>
+          <option value="BUT">BUT</option>
+          <option value="Licence">Licence</option>
+          <option value="Licence_Las">Licence - L.AS</option>
+          <option value="CPGE">CPGE</option>
+          <option value="Ecole de Commerce">École de Commerce</option>
+          <option value="IFSI">IFSI</option>
+          <option value="PASS">PASS</option>
+          <option value="EFTS">EFTS</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label>Sélectivité</label>
+        <select onchange={ updateSelectivite }>
+          <option value="">Toutes</option>
+          <option value="formation sélective">Sélective</option>
+          <option value="formation non sélective">Non sélective</option>
+        </select>
+      </div>
+
+      <div class="filter-item">
+        <label>Région</label>
+        <select onchange={ updateRegion }>
+          <option value="">Toutes</option>
+          <option value="Auvergne-Rhône-Alpes">Auvergne-Rhône-Alpes</option>
+          <option value="Bourgogne-Franche-Comté">Bourgogne-Franche-Comté</option>
+          <option value="Bretagne">Bretagne</option>
+          <option value="Centre-Val de Loire">Centre-Val de Loire</option>
+          <option value="Corse">Corse</option>
+          <option value="Grand Est">Grand Est</option>
+          <option value="Guadeloupe">Guadeloupe</option>
+          <option value="Guyane">Guyane</option>
+          <option value="Hauts-de-France">Hauts-de-France</option>
+          <option value="Ile-de-France">Île-de-France</option>
+          <option value="La Réunion">La Réunion</option>
+          <option value="Martinique">Martinique</option>
+          <option value="Mayotte">Mayotte</option>
+          <option value="Normandie">Normandie</option>
+          <option value="Nouvelle-Aquitaine">Nouvelle-Aquitaine</option>
+          <option value="Occitanie">Occitanie</option>
+          <option value="Pays de la Loire">Pays de la Loire</option>
+          <option value="Provence-Alpes-Côte d'Azur">PACA</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="filter-row">
+      <div class="filter-item">
+        <label>Taux d'accès min (%)</label>
+        <input type="number" min="0" max="100" value={ state.tauxMin } oninput={ updateTauxMin } placeholder="0" />
+      </div>
+      <div class="filter-item">
+        <label>Taux d'accès max (%)</label>
+        <input type="number" min="0" max="100" value={ state.tauxMax } oninput={ updateTauxMax } placeholder="100" />
+      </div>
+    </div>
+  </div>
+
+  <script>
+    export default {
+
+      state: {
+        query:        '',
+        showFilters:  false,
+        labelFiltres: 'Filtres avancés',
+        filiere:      '',
+        selectivite:  '',
+        region:       '',
+        tauxMin:      0,
+        tauxMax:      100
+      },
+
+      updateQuery(e)     { this.update({ query:       e.target.value }); },
+      updateFiliere(e)   { this.update({ filiere:     e.target.value }); },
+      updateSelectivite(e) { this.update({ selectivite: e.target.value }); },
+      updateRegion(e)    { this.update({ region:      e.target.value }); },
+      updateTauxMin(e)   { this.update({ tauxMin: Number(e.target.value) }); },
+      updateTauxMax(e)   { this.update({ tauxMax: Number(e.target.value) }); },
+
+      // Déclenche la recherche avec la touche Entrée
+      handleKey(e) {
+        if (e.key === 'Enter') { this.submitSearch(); }
+      },
+
+      // Affiche ou masque les filtres avancés
+      toggleFilters() {
+        var visible = !this.state.showFilters;
+        this.update({ showFilters: visible, labelFiltres: visible ? 'Masquer les filtres' : 'Filtres avancés' });
+      },
+
+      // Collecte tous les filtres et appelle le callback du parent
+      submitSearch() {
+        var filters = {
+          filiere:     this.state.filiere,
+          selectivite: this.state.selectivite,
+          region:      this.state.region,
+          tauxMin:     this.state.tauxMin,
+          tauxMax:     this.state.tauxMax
+        };
+        this.props.onsearch(this.state.query, filters);
+      }
+    };
+  </script>
+</search-bar>

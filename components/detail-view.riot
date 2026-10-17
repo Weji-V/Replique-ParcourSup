@@ -1,0 +1,526 @@
+<detail-view>
+  <!--
+    ==========================================================================
+    COMPOSANT <detail-view>
+
+    RÔLE : fiche détaillée d'une formation avec :
+      - Informations générales (établissement, ville, capacité...)
+      - Tableau de la phase principale d'admission (par type de bac)
+      - Tableau de la phase complémentaire
+      - Timeline de vitesse de remplissage (30 mai / 16 juin / 11 juillet)
+      - Graphiques Charts.css : répartition bac, mentions, profil sociologique
+      - Historique 2020–2025 (appel à chargerHistoriqueFormation via l'API)
+
+    PROPS reçues depuis <app> :
+      - formation : objet Formation normalisé (via creerFormation dans formation.js)
+      - onback    : callback() → retour à la liste de résultats
+
+    BIBLIOTHÈQUES UTILISÉES :
+      - Charts.css : graphiques déclaratifs via HTML/CSS uniquement (pas de JS)
+        Les graphiques sont construits dynamiquement via innerHTML
+    ==========================================================================
+  -->
+  <div if={ props.formation } class="detail-page">
+    <h2>Formation</h2>
+    <h1 class="formation-title">{ props.formation.etablissement } - { props.formation.nom }</h1>
+    <div class="formation-meta">
+      <p><b>Ville :</b> { props.formation.ville }</p>
+      <p><b>Département :</b> { props.formation.departement } { props.formation.departementLib }</p>
+      <p><b>Académie :</b> { props.formation.academie }</p>
+      <p>{ props.formation.contrat }</p>
+      <p><b>Capacité :</b> { props.formation.capacite }</p>
+    </div>
+
+    <div class="detail-grid">
+      <div>
+        <h2>Phase principale d'admission</h2>
+        <table class="detail-table">
+          <thead>
+            <tr>
+              <th>Bac</th>
+              <th>Voeux</th>
+              <th>Classés</th>
+              <th>Propositions</th>
+              <th>Acceptés</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Gén</td>
+              <td>{ props.formation.voePPGeneral }</td>
+              <td>{ props.formation.classesPPGeneral }</td>
+              <td>{ props.formation.propositionsPPGeneral }</td>
+              <td>{ props.formation.acceptesPPGeneral }</td>
+            </tr>
+            <tr>
+              <td>Techno</td>
+              <td>{ props.formation.voePPTechno }</td>
+              <td>{ props.formation.classesPPTechno }</td>
+              <td>{ props.formation.propositionsPPTechno }</td>
+              <td>{ props.formation.acceptesPPTechno }</td>
+            </tr>
+            <tr>
+              <td>Pro</td>
+              <td>{ props.formation.voePPPro }</td>
+              <td>{ props.formation.classesPPPro }</td>
+              <td>{ props.formation.propositionsPPPro }</td>
+              <td>{ props.formation.acceptesPPPro }</td>
+            </tr>
+            <tr>
+              <td>Autres</td>
+              <td>{ props.formation.voePPAutres }</td>
+              <td>{ props.formation.classesPPAutres }</td>
+              <td>{ props.formation.propositionsPPAutres }</td>
+              <td>{ props.formation.acceptesPPAutres }</td>
+            </tr>
+            <tr class="total-row">
+              <td>Total</td>
+              <td>{ props.formation.voePPTotal }</td>
+              <td>{ props.formation.classesPPTotal }</td>
+              <td>{ props.formation.propositionsPPTotal }</td>
+              <td>{ props.formation.acceptesPPTotal }</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="timeline-box">
+        <h3>Vitesse de remplissage</h3>
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div>
+              <b>Ouverture 30 mai</b><br />
+              { props.formation.pctDebutPhase }%
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div>
+              <b>16 juin</b><br />
+              { props.formation.pctDateBac }%
+            </div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div>
+              <b>11 juillet</b><br />
+              { props.formation.pctFinPhase }%
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h2>Phase complémentaire d'admission</h2>
+    <table class="detail-table">
+      <thead>
+        <tr>
+          <th>Bac</th>
+          <th>Voeux</th>
+          <th>Classés</th>
+          <th>Propositions</th>
+          <th>Acceptés</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Gén</td>
+          <td>{ props.formation.voePCGeneral }</td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Techno</td>
+          <td>{ props.formation.voePCTechno }</td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Pro</td>
+          <td>{ props.formation.voePCPro }</td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>Autres</td>
+          <td>{ props.formation.voePCAutres }</td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        <tr class="total-row">
+          <td>Total</td>
+          <td>{ props.formation.voePCTotal }</td>
+          <td>{ props.formation.classesPCTotal }</td>
+          <td>{ props.formation.acceptesPCTotal }</td>
+          <td>{ props.formation.acceptesPCTotal }</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ==================== GRAPHIQUES CHARTS.CSS ==================== -->
+
+    <h2 class="charts-heading">Profil des admis</h2>
+
+    <div class="charts-section">
+      <div class="chart-wrapper">
+        <h3>Répartition par type de bac</h3>
+        <div id="chart-bac" ref="graphBac"></div>
+      </div>
+
+      <div class="chart-wrapper">
+        <h3>Mentions au bac des admis</h3>
+        <div id="chart-mentions" ref="graphMentions"></div>
+      </div>
+
+      <div class="chart-wrapper chart-full">
+        <h3>Profil sociologique</h3>
+        <div id="chart-profil" ref="graphProfil"></div>
+      </div>
+    </div>
+
+    <!-- ==================== ÉVOLUTION HISTORIQUE ==================== -->
+
+    <h2 class="charts-heading">Évolution depuis 2020</h2>
+
+    <div if={ state.chargementHistorique } class="message">
+      Chargement de l'historique...
+    </div>
+
+    <div if={ !state.chargementHistorique && state.historique.length === 0 } class="message">
+      Aucune donnée historique disponible pour cette formation.
+    </div>
+
+    <div class="charts-section" if={ state.historique.length > 0 }>
+      <div class="chart-wrapper">
+        <h3>Taux d'accès par année</h3>
+        <div id="chart-evolution-taux" ref="graphTaux"></div>
+      </div>
+
+      <div class="chart-wrapper">
+        <h3>Nombre de candidats et admis</h3>
+        <div id="chart-evolution-candidats" ref="graphCandidats"></div>
+      </div>
+
+      <div class="chart-wrapper chart-full">
+        <h3>Évolution des mentions au bac</h3>
+        <div ref="graphMentionsHist"></div>
+      </div>
+    </div>
+
+    <button onclick={ retourListe } class="btn-retour">Retour à la liste</button>
+  </div>
+
+  <script>
+    export default {
+
+      // ========================================================================
+      // ÉTAT LOCAL du composant
+      // historique           : tableau des données historiques 2020-2025
+      // chargementHistorique : true pendant la requête API historique
+      // ========================================================================
+      state: {
+        historique:           [],
+        chargementHistorique: false
+      },
+
+      // Cycle de vie Riot : appelé une fois après l'insertion dans le DOM
+      // On lance les graphiques ET le chargement de l'historique en parallèle
+      onMounted() {
+        this.afficherGraphiques();
+        this.chargerHistorique(); // appel API asynchrone (ne bloque pas le rendu)
+      },
+
+      // Cycle de vie Riot : appelé après chaque mise à jour des props ou de l'état
+      // Nécessaire car Charts.css construit le HTML des graphiques via innerHTML
+      onUpdated() {
+        this.afficherGraphiques();
+
+        // On attend d'avoir les données historiques avant de construire ces graphiques
+        if (this.state.historique.length > 0) {
+          this.afficherGraphiquesHistoriques();
+        }
+      },
+
+      // Retour à la liste des résultats (délègue au parent via props.onback)
+      retourListe() {
+        this.props.onback();
+      },
+
+      // ========================================================================
+      // limiterValeur(val)
+      // RÔLE : convertir un pourcentage (0–100) en proportion (0–1) pour Charts.css.
+      //
+      // Charts.css utilise la propriété CSS custom --size (entre 0 et 1)
+      // pour déterminer la hauteur/largeur d'une barre.
+      // Ex: 75% d'accès → --size: 0.75 → barre à 75% de hauteur
+      //
+      // On clamp la valeur entre 0 et 1 pour éviter les débordements.
+      // ========================================================================
+      limiterValeur(val) {
+        if (val === null || val === undefined || isNaN(val)) {
+          return 0; // valeur manquante → barre à 0
+        }
+
+        var v = val / 100; // conversion % → proportion
+
+        if (v > 1) { return 1; } // max : barre pleine
+        if (v < 0) { return 0; } // min : barre vide
+
+        return Math.round(v * 100) / 100; // arrondi à 2 décimales
+      },
+
+      // ========================================================================
+      // afficherGraphiques()
+      // RÔLE : construire et injecter les 3 graphiques Charts.css de la formation.
+      //
+      // Pourquoi innerHTML ? Charts.css nécessite une structure HTML <table> précise
+      // avec des CSS custom properties (--size, --color) sur chaque <td>.
+      // Ces tables sont générées dynamiquement et injectées dans les divs ref=...
+      //
+      // Les 3 graphiques :
+      //   - graphBac      : colonnes → répartition par type de bac des admis
+      //   - graphMentions : colonnes → répartition par mention au bac des admis
+      //   - graphProfil   : barres horizontales → % femmes, boursiers, néo-bacs
+      // ========================================================================
+      afficherGraphiques() {
+        var f = this.props.formation;
+        if (!f) {
+          return; // pas de formation chargée → rien à afficher
+        }
+
+        // this.$() est la méthode Riot pour sélectionner un élément dans le DOM du composant
+        var graphBac      = this.$('[ref="graphBac"]');
+        var graphMentions = this.$('[ref="graphMentions"]');
+        var graphProfil   = this.$('[ref="graphProfil"]');
+
+        // Graphique 1 : répartition par type de bac (colonnes verticales)
+        if (graphBac) {
+          graphBac.innerHTML = this.construireGraphiqueColonnes([
+            { label: 'Général', valeur: f.pctGeneral, couleur: '#3d7fff' },
+            { label: 'Techno',  valeur: f.pctTechno,  couleur: '#f59e0b' },
+            { label: 'Pro',     valeur: f.pctPro,     couleur: '#10b981' }
+          ]);
+        }
+
+        // Graphique 2 : répartition par mention au bac (colonnes verticales)
+        if (graphMentions) {
+          graphMentions.innerHTML = this.construireGraphiqueColonnes([
+            { label: 'Sans',     valeur: f.pctSansMention, couleur: '#94a3b8' },
+            { label: 'AB',       valeur: f.pctAB,          couleur: '#60a5fa' },
+            { label: 'Bien',     valeur: f.pctB,           couleur: '#34d399' },
+            { label: 'TB',       valeur: f.pctTB,          couleur: '#fbbf24' },
+            { label: 'TB Féli.', valeur: f.pctTBF,         couleur: '#f472b6' }
+          ]);
+        }
+
+        // Graphique 3 : profil sociologique (barres horizontales)
+        if (graphProfil) {
+          graphProfil.innerHTML = this.construireGraphiqueBarres([
+            { label: 'Femmes',    valeur: f.pctFemmes,    couleur: '#a78bfa' },
+            { label: 'Boursiers', valeur: f.pctBoursiers, couleur: '#fb923c' },
+            { label: 'Néo-bac',  valeur: f.pctNeoBac,    couleur: '#2dd4bf' }
+          ]);
+        }
+      },
+
+      // ========================================================================
+      // chargerHistorique()
+      // RÔLE : charger les données 2020–2025 depuis api.js pour les graphiques
+      //        d'évolution historique.
+      //
+      // Le code UAI est extrait de l'ID de la formation (format "CODUAI-NomFormation")
+      // On le passe à chargerHistoriqueFormation() qui fait 6 appels API en série.
+      // ========================================================================
+      async chargerHistorique() {
+        var f = this.props.formation;
+        if (!f) {
+          return;
+        }
+
+        // L'ID de la formation est construit comme "COD_UAI-NomFormation"
+        // On extrait la partie avant le premier tiret pour avoir le code UAI
+        var codUai = f.id.split('-')[0];
+
+        if (!codUai || !window.chargerHistoriqueFormation) {
+          return; // pas de code UAI ou fonction non disponible
+        }
+
+        this.update({ chargementHistorique: true }); // affiche le spinner de chargement
+
+        try {
+          var historique = await window.chargerHistoriqueFormation(codUai, f.nom);
+          this.update({ historique: historique, chargementHistorique: false });
+          // onUpdated() est automatiquement appelé après update() → affichera les graphiques
+        } catch (e) {
+          console.error('Erreur chargement historique :', e);
+          this.update({ historique: [], chargementHistorique: false });
+        }
+      },
+
+      afficherGraphiquesHistoriques() {
+        var historique = this.state.historique;
+        if (!historique || historique.length === 0) {
+          return;
+        }
+
+        var graphTaux         = this.$('[ref="graphTaux"]');
+        var graphCandidats    = this.$('[ref="graphCandidats"]');
+        var graphMentionsHist = this.$('[ref="graphMentionsHist"]');
+
+        // Graphique : taux d'accès par année
+        if (graphTaux) {
+          var elementsAnnee = [];
+
+          for (var i = 0; i < historique.length; i++) {
+            elementsAnnee.push({
+              label:   '' + historique[i].annee,
+              valeur:  historique[i].tauxAcces,
+              couleur: '#1a936f'
+            });
+          }
+
+          graphTaux.innerHTML = this.construireGraphiqueColonnes(elementsAnnee);
+        }
+
+        // Graphique : candidats vs admis
+        if (graphCandidats) {
+          var maxCandidats = 0;
+
+          for (var i = 0; i < historique.length; i++) {
+            if (historique[i].candidats > maxCandidats) {
+              maxCandidats = historique[i].candidats;
+            }
+          }
+
+          var lignes = '';
+
+          for (var i = 0; i < historique.length; i++) {
+            var h           = historique[i];
+            var tailleCand  = 0;
+            var tailleAdmis = 0;
+
+            if (maxCandidats > 0) {
+              tailleCand  = Math.round((h.candidats / maxCandidats) * 100) / 100;
+              tailleAdmis = Math.round((h.admis / maxCandidats) * 100) / 100;
+            }
+
+            lignes += '<tr>';
+            lignes += '<th scope="row">' + h.annee + '</th>';
+            lignes += '<td style="--size: ' + tailleCand + '; --color: #2a5298;">';
+            lignes += '<span class="data">' + h.candidats + '</span></td>';
+            lignes += '<td style="--size: ' + tailleAdmis + '; --color: #1a936f;">';
+            lignes += '<span class="data">' + h.admis + '</span></td>';
+            lignes += '</tr>';
+          }
+
+          graphCandidats.innerHTML = '<table class="charts-css column multiple show-labels show-primary-axis show-4-secondary-axes data-spacing-10">'
+            + '<thead><tr><th scope="col">Année</th><th scope="col">Candidats</th><th scope="col">Admis</th></tr></thead>'
+            + '<tbody>' + lignes + '</tbody></table>';
+        }
+
+        // Tableau : évolution des mentions
+        if (graphMentionsHist) {
+          var tableau = '<table class="detail-table">';
+          tableau += '<thead><tr><th>Année</th><th>Sans mention</th><th>AB</th><th>Bien</th><th>TB</th><th>TB Féli.</th></tr></thead>';
+          tableau += '<tbody>';
+
+          for (var i = 0; i < historique.length; i++) {
+            var h = historique[i];
+            tableau += '<tr>';
+            tableau += '<td><b>' + h.annee + '</b></td>';
+            tableau += '<td>' + h.pctSansMention + '%</td>';
+            tableau += '<td>' + h.pctAB + '%</td>';
+            tableau += '<td>' + h.pctB + '%</td>';
+            tableau += '<td>' + h.pctTB + '%</td>';
+            tableau += '<td>' + h.pctTBF + '%</td>';
+            tableau += '</tr>';
+          }
+
+          tableau += '</tbody></table>';
+          graphMentionsHist.innerHTML = tableau;
+        }
+      },
+
+      // ========================================================================
+      // construireGraphiqueColonnes(elements)
+      // RÔLE : générer le HTML d'un graphique en colonnes verticales (Charts.css).
+      //
+      // PARAMÈTRE : tableau d'objets { label, valeur, couleur }
+      //   - label   : étiquette affichée sous la colonne
+      //   - valeur  : pourcentage (0–100) → converti en proportion par limiterValeur()
+      //   - couleur : couleur CSS de la colonne (hex ou nom)
+      //
+      // FORMAT Charts.css :
+      //   <table class="charts-css column ...">
+      //     <tbody>
+      //       <tr>
+      //         <th scope="row">Général</th>
+      //         <td style="--size: 0.75; --color: #3d7fff;"><span class="data">75%</span></td>
+      //       </tr>
+      //     </tbody>
+      //   </table>
+      // ========================================================================
+      construireGraphiqueColonnes(elements) {
+        var lignes = '';
+
+        for (var i = 0; i < elements.length; i++) {
+          var el      = elements[i];
+          var taille  = this.limiterValeur(el.valeur); // proportion 0–1 pour --size
+          var affiche = el.valeur || 0;                // valeur brute à afficher dans le tooltip
+
+          lignes += '<tr>';
+          lignes += '<th scope="row">' + el.label + '</th>';
+          lignes += '<td style="--size: ' + taille + '; --color: ' + el.couleur + ';">';
+          lignes += '<span class="data">' + affiche + '%</span>'; // affiché au survol
+          lignes += '</td></tr>';
+        }
+
+        // Classes Charts.css expliquées :
+        //   column                  → graphique en colonnes verticales
+        //   show-labels             → affiche les étiquettes (th)
+        //   show-primary-axis       → affiche l'axe horizontal du bas
+        //   show-4-secondary-axes   → affiche 4 lignes de grille horizontales
+        //   data-spacing-10         → espace de 10px entre les colonnes
+        return '<table class="charts-css column show-labels show-primary-axis show-4-secondary-axes data-spacing-10">'
+          + '<thead><tr><th scope="col">Type</th><th scope="col">%</th></tr></thead>'
+          + '<tbody>' + lignes + '</tbody></table>';
+      },
+
+      // ========================================================================
+      // construireGraphiqueBarres(elements)
+      // RÔLE : générer le HTML d'un graphique en barres horizontales (Charts.css).
+      //
+      // Identique à construireGraphiqueColonnes() mais avec class="charts-css bar"
+      // → les barres s'étendent horizontalement au lieu de verticalement.
+      // Utilisé pour le profil sociologique (femmes, boursiers, néo-bacs).
+      // ========================================================================
+      construireGraphiqueBarres(elements) {
+        var lignes = '';
+
+        for (var i = 0; i < elements.length; i++) {
+          var el      = elements[i];
+          var taille  = this.limiterValeur(el.valeur); // proportion 0–1
+          var affiche = el.valeur || 0;
+
+          lignes += '<tr>';
+          lignes += '<th scope="row">' + el.label + '</th>';
+          lignes += '<td style="--size: ' + taille + '; --color: ' + el.couleur + ';">';
+          lignes += '<span class="data">' + affiche + '%</span>';
+          lignes += '</td></tr>';
+        }
+
+        // "bar" à la place de "column" → barres horizontales
+        return '<table class="charts-css bar show-labels show-primary-axis show-4-secondary-axes data-spacing-14">'
+          + '<thead><tr><th scope="col">Catégorie</th><th scope="col">%</th></tr></thead>'
+          + '<tbody>' + lignes + '</tbody></table>';
+      }
+
+    };
+  </script>
+
+</detail-view>

@@ -1,0 +1,287 @@
+<comparateur-view>
+  <!--
+    ==========================================================================
+    COMPOSANT <comparateur-view>
+
+    RÔLE : comparer plusieurs formations côte à côte et estimer les chances
+           d'admission selon le profil de l'utilisateur.
+
+    PROPS reçues depuis <app> :
+      - formations : tableau des formations sélectionnées par l'utilisateur
+      - onretirer  : callback(id)   → retirer une formation de la sélection
+      - onvider    : callback()     → vider toute la sélection
+
+    FONCTIONNEMENT DE L'ESTIMATION :
+      Un score est calculé sur 100 points répartis en 3 critères :
+        - Taux d'accès de la formation (facilité d'accès globale)  → max 30 pts
+        - Note de l'étudiant (sur 20)                              → max 40 pts
+        - % de bacheliers de la même série intégrés                → max 30 pts
+      Le score final détermine une mention : Très favorable / Favorable / Possible / Difficile / Très difficile
+    ==========================================================================
+  -->
+
+  <!-- CAS 1 : au moins une formation est sélectionnée → affichage du comparateur -->
+  <div class="detail-card comparateur-card" if={ props.formations.length > 0 }>
+    <h2>Comparateur de formations</h2>
+
+    <p>Choisis ton profil pour estimer tes chances d'intégration.</p>
+
+    <!-- Contrôles du profil utilisateur : note, série, critère de tri -->
+    <div class="compare-controls">
+      <div>
+        <!-- Note moyenne de l'étudiant (utilisée dans le calcul du score) -->
+        <label><b>Note moyenne :</b></label><br />
+        <input
+          type="number"
+          min="0"
+          max="20"
+          step="0.1"
+          value={ state.note }
+          oninput={ mettreAJourNote }
+        />
+      </div>
+
+      <div>
+        <!-- Série bac : détermine quel % de bacheliers de ce type ont été acceptés -->
+        <label><b>Série :</b></label><br />
+        <select onchange={ mettreAJourSerie }>
+          <option value="general" selected={ state.serie === 'general' }>Général</option>
+          <option value="techno"  selected={ state.serie === 'techno'  }>Technologique</option>
+          <option value="pro"     selected={ state.serie === 'pro'     }>Professionnel</option>
+        </select>
+      </div>
+
+      <div>
+        <!-- Critère de tri des cartes de formations -->
+        <label><b>Trier par :</b></label><br />
+        <select onchange={ mettreAJourTri }>
+          <option value="nom"        selected={ state.sortBy === 'nom'        }>Nom</option>
+          <option value="ville"      selected={ state.sortBy === 'ville'      }>Ville</option>
+          <option value="taux"       selected={ state.sortBy === 'taux'       }>Taux d'accès</option>
+          <option value="estimation" selected={ state.sortBy === 'estimation' }>Estimation</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn btn-danger" onclick={ viderSelection }>Vider la sélection</button>
+
+    <hr />
+
+    <!-- Boucle sur les formations triées (obtenirSelectionTriee retourne le tableau ordonné) -->
+    <!-- classeCarte(f) applique une classe CSS différente selon l'estimation (couleur de la carte) -->
+    <div each={ f in obtenirSelectionTriee() } key={ f.id } class={ classeCarte(f) }>
+      <h4>{ f.nom }</h4>
+
+      <p><b>Établissement :</b> { f.etablissement }</p>
+      <p><b>Ville :</b> { f.ville }</p>
+      <p><b>Filière :</b> { f.filiere }</p>
+      <p><b>Capacité :</b> { f.capacite }</p>
+      <p><b>Taux d'accès :</b> { f.tauxAcces }%</p>
+
+      <!-- Répartition des intégrés par type de bac -->
+      <p>
+        <b>Intégrés :</b>
+        Général { f.pctGeneral }% /
+        Techno { f.pctTechno }% /
+        Pro { f.pctPro }%
+      </p>
+
+      <!-- Résultat de l'estimation avec badge coloré + détail des critères -->
+      <p class="estimation-result">
+        <span class={ classeEstimation(f) }>
+          { estimerFormation(f) }  <!-- ex: "Favorable", "Difficile"... -->
+        </span>
+        <span class="estimation-detail">{ detailEstimation(f) }</span>  <!-- ex: "Taux 42% · Gén 35% · Note 14/20" -->
+      </p>
+
+      <!-- Bouton pour retirer cette formation de la sélection -->
+      <button class="btn btn-small btn-outline" onclick={ retirerSelection.bind(this, f.id) }>
+        Retirer
+      </button>
+    </div>
+  </div>
+
+  <!-- CAS 2 : aucune formation sélectionnée → message d'aide -->
+  <div class="message" if={ props.formations.length === 0 }>
+    <h3>Aucune formation sélectionnée</h3>
+    <p>Retourne à la <a href="#/">recherche</a> et clique sur "Ajouter à la sélection" pour comparer des formations.</p>
+  </div>
+
+  <script>
+    export default {
+
+      // ========================================================================
+      // ÉTAT LOCAL du composant
+      // note   : note moyenne de l'étudiant (défaut 12/20)
+      // serie  : type de bac ('general' | 'techno' | 'pro')
+      // sortBy : critère de tri courant ('nom' | 'ville' | 'taux' | 'estimation')
+      // ========================================================================
+      state: {
+        note:   12,
+        serie:  'general',
+        sortBy: 'nom'
+      },
+
+      // --- Mise à jour du profil utilisateur ---
+      // Chaque handler lit la valeur du champ et met à jour l'état → re-rendu automatique
+      mettreAJourNote(e)  { this.update({ note:   Number(e.target.value) }); },
+      mettreAJourSerie(e) { this.update({ serie:  e.target.value });         },
+      mettreAJourTri(e)   { this.update({ sortBy: e.target.value });         },
+
+      // --- Actions sur la sélection (déléguées au parent via props) ---
+      // Ces fonctions ne modifient pas l'état local : elles délèguent au parent (app.riot)
+      retirerSelection(id) { this.props.onretirer(id); },
+      viderSelection()     { this.props.onvider();     },
+
+      // ========================================================================
+      // obtenirSelectionTriee()
+      // RÔLE : retourner une copie triée du tableau de formations selon state.sortBy.
+      //
+      // On utilise slice() pour copier sans modifier le tableau original.
+      // localeCompare() trie correctement les chaînes avec accents et majuscules.
+      // ========================================================================
+      obtenirSelectionTriee() {
+        var selection = (this.props.formations || []).slice(); // copie du tableau
+        var soi       = this;
+
+        if (this.state.sortBy === 'taux') {
+          // Tri décroissant par taux d'accès (le plus accessible en premier)
+          selection.sort(function(a, b) { return b.tauxAcces - a.tauxAcces; });
+        } else if (this.state.sortBy === 'ville') {
+          // Tri alphabétique par ville (localeCompare gère le français correctement)
+          selection.sort(function(a, b) { return a.ville.localeCompare(b.ville); });
+        } else if (this.state.sortBy === 'estimation') {
+          // Tri décroissant par score (la formation la plus accessible en premier)
+          selection.sort(function(a, b) { return soi.calculerScore(b) - soi.calculerScore(a); });
+        } else {
+          // Tri alphabétique par nom de formation (ordre par défaut)
+          selection.sort(function(a, b) { return a.nom.localeCompare(b.nom); });
+        }
+
+        return selection;
+      },
+
+      // ========================================================================
+      // pourcentageSerie(f)
+      // RÔLE : retourner le pourcentage d'admis de la série bac choisie par l'utilisateur.
+      //
+      // Si l'utilisateur a sélectionné "Technologique", on retourne f.pctTechno
+      // (% de bacheliers techno parmi les admis de cette formation).
+      // ========================================================================
+      pourcentageSerie(f) {
+        if (this.state.serie === 'general') { return f.pctGeneral || 0; }
+        if (this.state.serie === 'techno')  { return f.pctTechno  || 0; }
+        if (this.state.serie === 'pro')     { return f.pctPro     || 0; }
+        return 0;
+      },
+
+      // ========================================================================
+      // calculerScore(f)
+      // RÔLE : calculer un score de 0 à 100 estimant les chances d'admission.
+      //
+      // ALGORITHME :
+      //   Critère 1 — Taux d'accès de la formation (max 30 pts)
+      //     → Une formation avec 80%+ d'accès donne 30 pts (très accessible)
+      //     → Une formation avec <15% d'accès donne 2 pts (très sélective)
+      //
+      //   Critère 2 — Note de l'étudiant (max 40 pts)
+      //     → 17+ /20 donne 40 pts
+      //     → <9  /20 donne 0 pt
+      //
+      //   Critère 3 — % de bacheliers de la même série (max 30 pts)
+      //     → Si 60%+ des admis sont du même type de bac, c'est bon signe
+      //     → Si <5%, ce type de bac est rarement accepté dans cette formation
+      //
+      // REMARQUE : ce calcul est une ESTIMATION heuristique, non un algorithme officiel.
+      // ========================================================================
+      calculerScore(f) {
+        var score     = 0;
+        var note      = this.state.note;
+        var tauxAcces = f.tauxAcces || 0;
+        var pctSerie  = this.pourcentageSerie(f);
+
+        // Critère 1 : taux d'accès de la formation (facilité globale d'entrée)
+        if      (tauxAcces >= 80) { score += 30; } // très accessible
+        else if (tauxAcces >= 50) { score += 24; }
+        else if (tauxAcces >= 30) { score += 16; }
+        else if (tauxAcces >= 15) { score += 8;  }
+        else                      { score += 2;  } // très sélectif
+
+        // Critère 2 : note de l'étudiant
+        if      (note >= 17) { score += 40; } // excellent
+        else if (note >= 15) { score += 32; }
+        else if (note >= 13) { score += 22; }
+        else if (note >= 11) { score += 14; }
+        else if (note >=  9) { score += 6;  }
+        else                 { score += 0;  } // note insuffisante
+
+        // Critère 3 : proportion de bacheliers de la même série acceptés dans cette formation
+        if      (pctSerie >= 60) { score += 30; } // la série est très représentée
+        else if (pctSerie >= 40) { score += 24; }
+        else if (pctSerie >= 20) { score += 16; }
+        else if (pctSerie >=  5) { score += 8;  }
+        else                     { score += 0;  } // la série est presque absente
+
+        return score; // score total entre 0 et 100
+      },
+
+      // ========================================================================
+      // estimerFormation(f)
+      // RÔLE : convertir le score numérique en une mention textuelle.
+      // Les seuils sont calibrés pour donner une répartition équilibrée.
+      // ========================================================================
+      estimerFormation(f) {
+        var score = this.calculerScore(f);
+        if (score >= 85) { return 'Très favorable'; }
+        if (score >= 65) { return 'Favorable';      }
+        if (score >= 45) { return 'Possible';        }
+        if (score >= 25) { return 'Difficile';       }
+        return 'Très difficile';
+      },
+
+      // --- Classes CSS dynamiques selon l'estimation ---
+      // Applique un style coloré différent selon le résultat (vert → rouge)
+
+      // Classe pour le badge d'estimation (texte inline)
+      classeEstimation(f) {
+        var r = this.estimerFormation(f);
+        if (r === 'Très favorable') { return 'estimate tres-favorable'; }
+        if (r === 'Favorable')      { return 'estimate favorable';      }
+        if (r === 'Possible')       { return 'estimate possible';       }
+        if (r === 'Difficile')      { return 'estimate difficile';      }
+        return 'estimate tres-difficile';
+      },
+
+      // Classe pour la carte entière (fond coloré)
+      classeCarte(f) {
+        var r = this.estimerFormation(f);
+        if (r === 'Très favorable') { return 'card card-tres-favorable'; }
+        if (r === 'Favorable')      { return 'card card-favorable';      }
+        if (r === 'Possible')       { return 'card card-possible';       }
+        if (r === 'Difficile')      { return 'card card-difficile';      }
+        return 'card card-tres-difficile';
+      },
+
+      // ========================================================================
+      // detailEstimation(f)
+      // RÔLE : générer une ligne de détail lisible avec les 3 critères utilisés.
+      // Exemple : "Taux 42% · Gén 35% · Note 14/20"
+      // Permet à l'utilisateur de comprendre d'où vient l'estimation.
+      // ========================================================================
+      detailEstimation(f) {
+        var tauxAcces = f.tauxAcces || 0;
+        var pctSerie  = this.pourcentageSerie(f);
+        var nomSerie  = '';
+
+        // Libellé court de la série pour l'affichage
+        if      (this.state.serie === 'general') { nomSerie = 'Gén';    }
+        else if (this.state.serie === 'techno')  { nomSerie = 'Techno'; }
+        else                                     { nomSerie = 'Pro';    }
+
+        return 'Taux ' + tauxAcces + '% · ' + nomSerie + ' ' + pctSerie + '% · Note ' + this.state.note + '/20';
+      }
+
+    };
+  </script>
+
+</comparateur-view>

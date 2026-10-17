@@ -1,0 +1,235 @@
+<auth-panel>
+  <!--
+    ==========================================================================
+    COMPOSANT <auth-panel>
+
+    RÔLE : gestion complète de l'authentification Firebase dans le header.
+
+    COMPORTEMENT VISIBLE :
+      - Si non connecté  : bouton "Connexion" → ouvre une modale
+      - Si connecté      : email de l'utilisateur + bouton "Déconnexion"
+
+    MODALE D'AUTHENTIFICATION :
+      - Onglet "Connexion"  : formulaire email/mot de passe pour se connecter
+      - Onglet "Inscription": même formulaire pour créer un compte Firebase
+
+    PROPS reçues depuis <app> :
+      - user     : objet utilisateur Firebase (ou null si non connecté)
+      - onauth   : callback appelé après connexion/inscription réussie
+      - onlogout : callback appelé après déconnexion réussie
+    ==========================================================================
+  -->
+
+  <!-- Bouton "Connexion" dans le header — visible uniquement si pas connecté -->
+  <div class="auth-header-btn" if={ !props.user }>
+    <button class="btn btn-auth" onclick={ ouvrirModale }>
+      <span class="auth-icon"></span> Connexion
+    </button>
+  </div>
+
+  <!-- Informations utilisateur dans le header — visible uniquement si connecté -->
+  <div class="auth-user-info" if={ props.user }>
+    <span class="auth-email">{ props.user.email }</span>
+    <button class="btn btn-auth-logout" onclick={ seDeconnecter }>Déconnexion</button>
+  </div>
+
+  <!-- Modale d'authentification (overlay + contenu centré) -->
+  <!-- onclick={ cliquerFond } ferme la modale si on clique en dehors -->
+  <div class="auth-modal-overlay" if={ state.visible } onclick={ cliquerFond }>
+    <div class="auth-modal">
+
+      <!-- Croix de fermeture -->
+      <button class="auth-modal-close" onclick={ fermerModale }>✕</button>
+
+      <!-- Titre dynamique : "Connexion" ou "Créer un compte" selon l'onglet actif -->
+      <h2 class="auth-modal-title">{ state.titre }</h2>
+
+      <!-- Onglets pour basculer entre connexion et inscription -->
+      <div class="auth-tabs">
+        <button class={ state.classBtnConnexion }   onclick={ afficherConnexion }>
+          Connexion
+        </button>
+        <button class={ state.classBtnInscription } onclick={ afficherInscription }>
+          Inscription
+        </button>
+      </div>
+
+      <!-- Formulaire unique utilisé pour les deux modes (connexion et inscription) -->
+      <!-- onsubmit={ validerFormulaire } intercepte la soumission native du formulaire -->
+      <form onsubmit={ validerFormulaire } class="auth-form">
+
+        <div class="auth-field">
+          <label>Adresse e-mail</label>
+          <input
+            type="email"
+            name="email"
+            placeholder="exemple@email.com"
+            required
+          />
+        </div>
+
+        <div class="auth-field">
+          <label>Mot de passe</label>
+          <input
+            type="password"
+            name="password"
+            placeholder="••••••••"
+            required
+            minlength="6"
+          />
+        </div>
+
+        <!-- Message d'erreur : affiché uniquement si state.erreur est défini -->
+        <div class="auth-error" if={ state.erreur }>
+          { state.erreur }
+        </div>
+
+        <!-- Bouton désactivé pendant le chargement pour éviter les doubles soumissions -->
+        <button type="submit" class="btn btn-primary auth-submit" disabled={ state.chargement }>
+          { state.labelBouton }
+        </button>
+
+      </form>
+    </div>
+  </div>
+
+  <script>
+    export default {
+
+      // ========================================================================
+      // ÉTAT LOCAL du composant
+      // visible     : true si la modale est ouverte
+      // mode        : 'connexion' ou 'inscription' (détermine l'action Firebase)
+      // chargement  : true pendant l'appel Firebase (désactive le bouton submit)
+      // erreur      : message d'erreur à afficher (null si pas d'erreur)
+      // titre, labelBouton, classBtn... : textes dynamiques selon le mode actif
+      // ========================================================================
+      state: {
+        visible:             false,
+        mode:                'connexion',
+        chargement:          false,
+        erreur:              null,
+        titre:               'Connexion',
+        labelBouton:         'Se connecter',
+        classBtnConnexion:   'auth-tab active',
+        classBtnInscription: 'auth-tab'
+      },
+
+      // Ouvrir la modale et effacer les erreurs précédentes
+      ouvrirModale() {
+        this.update({ visible: true, erreur: null });
+      },
+
+      // Fermer la modale et effacer les erreurs
+      fermerModale() {
+        this.update({ visible: false, erreur: null });
+      },
+
+      // Fermer si l'utilisateur clique sur l'overlay (fond sombre)
+      // e.target === e.currentTarget : vrai seulement si on clique sur le fond lui-même
+      // et non sur le contenu de la modale (qui stopperait la propagation)
+      cliquerFond(e) {
+        if (e.target === e.currentTarget) {
+          this.fermerModale();
+        }
+      },
+
+      // Basculer vers l'onglet "Connexion"
+      afficherConnexion() {
+        this.update({
+          mode:                'connexion',
+          erreur:              null,
+          titre:               'Connexion',
+          labelBouton:         'Se connecter',
+          classBtnConnexion:   'auth-tab active',
+          classBtnInscription: 'auth-tab'
+        });
+      },
+
+      // Basculer vers l'onglet "Inscription"
+      afficherInscription() {
+        this.update({
+          mode:                'inscription',
+          erreur:              null,
+          titre:               'Créer un compte',
+          labelBouton:         'Créer le compte',
+          classBtnConnexion:   'auth-tab',
+          classBtnInscription: 'auth-tab active'
+        });
+      },
+
+      // ========================================================================
+      // validerFormulaire(e)
+      // RÔLE : soumettre le formulaire via Firebase Auth selon le mode actif.
+      //
+      // Étapes :
+      //   1. e.preventDefault() : empêche le rechargement de la page (comportement natif)
+      //   2. Lecture des champs email et password
+      //   3. Appel Firebase (createAccount ou login) selon state.mode
+      //   4. Si succès : fermer la modale et appeler props.onauth
+      //   5. Si échec : traduire le code d'erreur Firebase en message lisible
+      //
+      // Les codes d'erreur Firebase (err.code) sont des chaînes standardisées
+      // ex: "auth/email-already-in-use", "auth/wrong-password", etc.
+      // ========================================================================
+      async validerFormulaire(e) {
+        e.preventDefault(); // empêche la soumission HTML classique (rechargement de page)
+
+        var email    = e.target.email.value.trim();
+        var password = e.target.password.value;
+        var services = window.firebaseServices;
+
+        this.update({ chargement: true, erreur: null }); // désactive le bouton pendant l'appel
+
+        try {
+
+          if (this.state.mode === 'inscription') {
+            await services.createAccount(email, password); // crée le compte Firebase
+          } else {
+            await services.login(email, password);         // connecte l'utilisateur
+          }
+
+          this.update({ visible: false, chargement: false });
+          // Notifie le parent que l'authentification a réussi
+          this.props.onauth && this.props.onauth();
+
+        } catch (err) {
+
+          // Traduction des codes d'erreur Firebase en messages utilisateur compréhensibles
+          var messageErreur = 'Une erreur est survenue.';
+
+          if (err.code === 'auth/email-already-in-use') {
+            messageErreur = 'Cet e-mail est déjà utilisé.';
+          } else if (err.code === 'auth/invalid-email') {
+            messageErreur = 'Adresse e-mail invalide.';
+          } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+            messageErreur = 'E-mail ou mot de passe incorrect.';
+          } else if (err.code === 'auth/weak-password') {
+            messageErreur = 'Le mot de passe doit faire au moins 6 caractères.';
+          } else if (err.code === 'auth/user-not-found') {
+            messageErreur = 'Aucun compte trouvé avec cet e-mail.';
+          }
+
+          this.update({ chargement: false, erreur: messageErreur });
+        }
+      },
+
+      // ========================================================================
+      // seDeconnecter()
+      // RÔLE : déconnecter l'utilisateur via Firebase et notifier le parent.
+      // app.riot réagit en vidant la sélection (props.onlogout → surDeconnexion).
+      // ========================================================================
+      async seDeconnecter() {
+        try {
+          await window.firebaseServices.logout();
+          // Notifie le parent pour qu'il vide la sélection et mette à jour l'UI
+          this.props.onlogout && this.props.onlogout();
+        } catch (err) {
+          console.error('Erreur déconnexion :', err);
+        }
+      }
+
+    };
+  </script>
+
+</auth-panel>

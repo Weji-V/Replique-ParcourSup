@@ -1,0 +1,8 @@
+# Fichiers de présentation et documentation temporaire
+fonctions_js_soutenance.md
+
+# Autres fichiers courants à ignorer
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
